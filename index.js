@@ -2,24 +2,27 @@ import * as THREE from "./threeJS/three.js-r145-compressed/build/three.module.js
 import { OrbitControls } from "./threeJS/three.js-r145-compressed/examples/jsm/controls/OrbitControls.js";
 import { FontLoader } from "./threeJS/three.js-r145-compressed/examples/jsm/loaders/FontLoader.js";
 import { TextGeometry } from "./threeJS/three.js-r145-compressed/examples/jsm/geometries/TextGeometry.js";
+import { FirstPersonControls } from './threeJS/three.js-r145-compressed/examples/jsm/controls/FirstPersonControls.js';
+
 
 var camera, scene, renderer, controls;
 var FPcamera, darkWarrior;
 var activeCamera;
+var raycaster, pointer;
 
 let createAmbientLight =() =>{
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    const ambientLight = new THREE.AmbientLight("#FFFFFF", 0.7);
     return ambientLight;
 }
 
 let createSpotLight =() =>{
-    const spotLight = new THREE.SpotLight(0xffffff, 1.2);
-    spotLight.distance = 1000;
+    const spotLight = new THREE.SpotLight("#FFFFFF", 1.2);
+    spotLight.castShadow = true;
     return spotLight;
 }
 
 let createDirectionalLight =() =>{
-    const directionalLight = new THREE.DirectionalLight(0xffffee, 0.5);
+    const directionalLight = new THREE.DirectionalLight("#FFFFEE", 0.5);
     directionalLight.position.set(5, 2, 8);
     return directionalLight;
 }
@@ -32,14 +35,14 @@ let createGround =(width, height, depth) =>{
     texture.repeat.set( width / 2, depth / 2 );
 
     const groundGeometry = new THREE.BoxGeometry(width, height, depth);
-    const groundMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, map: texture });
+    const groundMaterial = new THREE.MeshStandardMaterial({ color: "#FFFFFF", map: texture });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     
     return ground;    
 }
 
 let createSpellEffect =() =>{
-    const spellGeometry = new THREE.PointLight(0xffd700, 2, 3);
+    const spellGeometry = new THREE.PointLight("#FFD700", 2, 3);
     return spellGeometry;
 }
 
@@ -47,21 +50,21 @@ let createTrunk =() =>{
     const loader = new THREE.TextureLoader();;
     const texture = loader.load('./assets/textures/tree/chinese_cedar_bark_diff_1k.jpg');
     const trunkGeometry = new THREE.CylinderGeometry(0.6, 0.6, 3);
-    const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, map: texture });
+    const trunkMaterial = new THREE.MeshStandardMaterial({ color: "#FFFFFF", map: texture });
     const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
     return trunk;
 }
 
 let createBotLeaves =() =>{
     const BotLeavesGeometry = new THREE.ConeGeometry(3, 4);
-    const BotLeavesMaterial = new THREE.MeshStandardMaterial({ color: 0x347f2f });
+    const BotLeavesMaterial = new THREE.MeshStandardMaterial({ color: "#347f2f" });
     const BotLeaves = new THREE.Mesh(BotLeavesGeometry, BotLeavesMaterial);
     return BotLeaves;
 }
 
 let createTopLeaves =() =>{
     const TopLeavesGeometry = new THREE.ConeGeometry(2.1, 2.8);
-    const TopLeavesMaterial = new THREE.MeshStandardMaterial({ color: 0x347f2f });
+    const TopLeavesMaterial = new THREE.MeshStandardMaterial({ color: "#347f2f" });
     const TopLeaves = new THREE.Mesh(TopLeavesGeometry, TopLeavesMaterial);
     return TopLeaves;
 }
@@ -69,7 +72,6 @@ let createTopLeaves =() =>{
 let createText = (scene) => {
     const loader = new FontLoader();
 
-    // Ensure this path matches your folder structure exactly
     loader.load('./threeJS/three.js-r145-compressed/examples/fonts/helvetiker_bold.typeface.json', function (font) {
         const textGeometry = new TextGeometry('OVerlord', {
             font: font,
@@ -81,7 +83,7 @@ let createText = (scene) => {
 
         textGeometry.center();
 
-        const textMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
+        const textMaterial = new THREE.MeshStandardMaterial({ color: "#FFFFFF" });
         const textMesh = new THREE.Mesh(textGeometry, textMaterial);
 
         textMesh.position.set(-6, 4, 5);
@@ -117,6 +119,51 @@ let createSkyBox = (scene) => {
     
     scene.add(skybox);
 }
+
+let createBody = (width, height, depth, color) => {
+    const loader = new THREE.TextureLoader();
+
+    const geo = new THREE.BoxGeometry(width, height, depth);
+    // const material = new THREE.MeshPhongMaterial( {color: color} );
+
+    const material = [
+    new THREE.MeshPhongMaterial({ map: loader.load("./assets/textures/hamsuke/side.png"), color: color }),
+    new THREE.MeshPhongMaterial({ map: loader.load("./assets/textures/hamsuke/side.png"), color: color }),
+    new THREE.MeshPhongMaterial({ map: loader.load("./assets/textures/hamsuke/top&back.png"), color: color }),
+    new THREE.MeshPhongMaterial({ map: loader.load("./assets/textures/hamsuke/top&back.png"), color: color }),
+    new THREE.MeshPhongMaterial({ map: loader.load("./assets/textures/hamsuke/front_happy.png"), color: color }),
+    new THREE.MeshPhongMaterial({ map: loader.load("./assets/textures/hamsuke/top&back.png"), color: color })
+];
+    
+    const box = new THREE.Mesh(geo, material);
+    box.castShadow = true;
+    box.receiveShadow = true;
+
+    box.name = "hamster";
+
+    return box;
+}
+
+let createTail = (w, h, d, color) => {
+    const geo = new THREE.BoxGeometry(w, h, d)
+    const material = new THREE.MeshPhongMaterial( {color: color})
+    const box = new THREE.Mesh(geo, material);
+    box.castShadow = true;
+    box.receiveShadow = true;
+
+    return box;
+}
+
+let createCone = (radius, height, radSeg, color) => {
+    const geo = new THREE.ConeGeometry(radius, height, radSeg);
+    const material = new THREE.MeshPhongMaterial( {color: color} );
+    const cone = new THREE.Mesh(geo, material);
+
+    cone.castShadow = true;
+    cone.receiveShadow = true;
+
+    return cone;
+}
     
 const init = () => {
     scene = new THREE.Scene();
@@ -134,6 +181,8 @@ const init = () => {
     document.body.appendChild(renderer.domElement);
 
     controls = new OrbitControls(camera, renderer.domElement);
+    raycaster = new THREE.Raycaster();
+    pointer = new THREE.Vector2();
    
     let ground = createGround(25,2,25);
     ground.position.set(0,-1,0);
@@ -174,13 +223,44 @@ const init = () => {
 
     createText(scene);
 
+    let hamsterBody = createBody(2, 2, 2, "#FFFFFF");
+    hamsterBody.position.set(3, 1, -1);
+    hamsterBody.rotation.set(0, Math.PI/8, 0);
+
+    let hamsterTail = new THREE.Group();
+
+    let hamsterTailMain = createTail(0.6, 2.8, 0.6, "#023020");
+    hamsterTailMain.position.set(2.6, 1.4, -2.25);
+    hamsterTailMain.rotation.set(0, Math.PI/8, 0)
+    hamsterTail.add(hamsterTailMain);
+
+    let hamsterTailExt = createTail(0.6, 0.6, 1.4, "#023020");
+    hamsterTailExt.position.set(2.44, 2.8, -2.62);
+    hamsterTailExt.rotation.set(0, Math.PI/8, Math.PI/2);
+    hamsterTail.add(hamsterTailExt);
+
+    let hamsterEar = new THREE.Group();
+
+    let leftEar = createCone(0.2, 0.7, 128, "#023020"); // colour = #6B6860
+    leftEar.position.set(4.05, 2.2, -0.6);
+    leftEar.rotation.set(0, 0, -Math.PI/8);
+    hamsterEar.add(leftEar);
+
+    let rightEar = createCone(0.2, 0.7, 128, "#6B6860")
+    rightEar.position.set(2.5, 2.2, 0)
+    // rightEar.rotation.set(0, 0, Math.PI/8)      <-- di word pake rotation ini
+    rightEar.rotation.set(0, 0, Math.PI/8)   // but this is the right rotation?
+    hamsterEar.add(rightEar);
+
+
     let objects = [
         ground,
         trunk1, trunk2, trunk3,
         BotLeaves1, BotLeaves2, BotLeaves3,
         TopLeaves1, TopLeaves2, TopLeaves3,
         spell, 
-        spotLight, directionalLight
+        spotLight, directionalLight,
+        hamsterBody, hamsterTail, hamsterEar
     ]
 
     objects.forEach(obj => {
@@ -194,11 +274,39 @@ const init = () => {
 };
 
 const render = () => {
-    
     renderer.render(scene, camera);
     requestAnimationFrame(render);
     controls.update();
 };
+
+function onMouseClick(event) {
+    pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+    pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(pointer, camera);
+    let intersects = raycaster.intersectObjects(scene.children, true);
+
+    for (let i = 0; i<intersects.length; i++) {
+        if (intersects[i].object.name == "hamster") 
+        {
+            const mesh = intersects[i].object;
+            const loader = new THREE.TextureLoader();
+
+            if(mesh.userData.isSad) 
+            {
+                mesh.material[4].map = loader.load("./assets/textures/hamsuke/front_happy.png");
+                mesh.userData.isSad = false
+            } 
+            else 
+            {
+                mesh.material[4].map = loader.load("./assets/textures/hamsuke/front_sad.png");
+                mesh.userData.isSad = true;
+            }
+
+            mesh.material[4].needsUpdate = true;
+        }
+    }
+}
 
 window.onload = () => {
     init();
@@ -210,3 +318,5 @@ window.onresize = () => {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 };
+
+window.addEventListener('click', onMouseClick);
